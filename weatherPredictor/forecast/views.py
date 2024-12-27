@@ -15,26 +15,47 @@ from forecast.api_key import API_KEY
 
 BASE_URL = 'https://api.openweathermap.org/data/2.5/' #base url for API requests
 
-#1. Fetch Current Weather Data
+# Helper function to get rounded value or NaN
+def get_rounded_value(data, key):
+    value = data.get(key, np.nan)
+    return round(value) if not np.isnan(value) else np.nan
+
+# 1. Fetch Current Weather Data
 def get_current_weather(city):
-  url = f"{BASE_URL}weather?q={city}&appid={API_KEY}&units=metric" #construct the API request URL
-  response = requests.get(url) #send the get request to the API
-  data = response.json();
-  return {
-      'city' : data['name'],
-      'current_temp' : round(data['main']['temp']),
-      'feels_like' : round(data['main']['feels_like']),
-      'temp_min' : round(data['main']['temp_min']),
-      'temp_max' : round(data['main']['temp_max']),
-      'humidity' : round(data['main']['humidity']),
-      'description' : data['weather'][0]['description'],
-      'country' : data['sys']['country'],
-      'wind_gust_dir' : data['wind']['deg'],
-      'pressure': data['main']['pressure'],
-      'Wind_Gust_Speed': data['wind']['speed'],
-      'clouds': data['clouds']['all'],
-      'visibility': data['visibility']
-  }
+    url = f"{BASE_URL}weather?q={city}&appid={API_KEY}&units=metric"
+    response = requests.get(url)
+    data = response.json()
+
+    if response.status_code != 200:
+        return {'error': True, 'code': data.get('cod'), 'message': "OpenWeather: " + data.get('message')}
+
+    return_data = {}
+    return_data['city'] = data.get('name', np.nan)
+
+    main_data = data.get('main', {})
+    return_data['current_temp'] = get_rounded_value(main_data, 'temp')
+    return_data['feels_like'] = get_rounded_value(main_data, 'feels_like')
+    return_data['temp_min'] = get_rounded_value(main_data, 'temp_min')
+    return_data['temp_max'] = get_rounded_value(main_data, 'temp_max')
+    return_data['humidity'] = get_rounded_value(main_data, 'humidity')
+    return_data['pressure'] = get_rounded_value(main_data, 'pressure')
+
+    weather_data = data.get('weather', [{}])
+    return_data['description'] = weather_data[0].get('description', np.nan) if weather_data else np.nan
+
+    sys_data = data.get('sys', {})
+    return_data['country'] = sys_data.get('country', np.nan)
+
+    wind_data = data.get('wind', {})
+    return_data['wind_gust_dir'] = wind_data.get('deg', np.nan)
+    return_data['Wind_Gust_Speed'] = wind_data.get('speed', np.nan)
+
+    clouds_data = data.get('clouds', {})
+    return_data['clouds'] = clouds_data.get('all', np.nan)
+
+    return_data['visibility'] = data.get('visibility', np.nan)
+
+    return return_data
 
 #2. Read Historical Data
 def read_historical_data(filename):
@@ -101,6 +122,9 @@ def weather_view(request):
   if request.method == 'POST':
     city = request.POST.get('city')
     current_weather = get_current_weather(city)
+
+    if 'error' in current_weather:
+      return render(request, 'weather.html', {'error': current_weather['message'], 'code': current_weather['code']})
 
     #load historical data
     csv_path = os.path.join('/Users/i554234/repos/WeatherPredictorApp/weatherPredictor/weather.csv')

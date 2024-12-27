@@ -26,28 +26,34 @@
                     </button>
                 </div>
             </form>
-            <div class="day-stats">
-                <h2 class="day-stats__temperature">
-                    <span class="day-stats__temperature__value">{{ current_temp }}</span>•C
-                </h2>
-                <h3 class="day-stats__feelslike">
-                    Feels like:&nbsp&nbsp<span class="day-stats__feelslike__value">{{ feels_like }}</span>•C
-                </h3>
-                <ul class="day-stats_conditions">
-                    <li>
-                        <p class="day-stats_condition">
-                            <span class="day-stats__humidity">{{ humidity }}</span>%
-                        </p>
-                        <p class="day-stats__condition_text">of humidity</p>
-                    </li>
-                    <li>
-                        <p class="day-stats_condition">
-                            <span class="day-stats__clouds">{{ clouds }}</span>%
-                        </p>
-                        <p class="day-stats__condition_text">of Clouds</p>
-                    </li>
-                </ul>
-            </div>
+            {% if error %}
+                <div class="error-message" style="display: none;">
+                    {{ error }}
+                </div>
+            {% else %}
+                <div class="day-stats">
+                    <h2 class="day-stats__temperature">
+                        <span class="day-stats__temperature__value">{{ current_temp }}</span>•C
+                    </h2>
+                    <h3 class="day-stats__feelslike">
+                        Feels like:&nbsp&nbsp<span class="day-stats__feelslike__value">{{ feels_like }}</span>•C
+                    </h3>
+                    <ul class="day-stats_conditions">
+                        <li>
+                            <p class="day-stats_condition">
+                                <span class="day-stats__humidity">{{ humidity }}</span>%
+                            </p>
+                            <p class="day-stats__condition_text">of humidity</p>
+                        </li>
+                        <li>
+                            <p class="day-stats_condition">
+                                <span class="day-stats__clouds">{{ clouds }}</span>%
+                            </p>
+                            <p class="day-stats__condition_text">of Clouds</p>
+                        </li>
+                    </ul>
+                </div>
+            {% endif %}
             <img src="{% static 'img/side-blur.png' %}" class="sideblur" alt="blur"/>
         </section>
 
@@ -125,5 +131,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="{% static 'js/chartSetup.js' %}"></script>
+    <script type="module" src="{% static 'js/searchButton.js' %}"></script>
 </body>
 </html>
