@@ -94,6 +94,10 @@ main.showers {
     background-image: url('../img/showers.jpeg');
 }
 
+main.error {
+    background-image: url('../img/error.jpg');
+}
+
 .side-container {
     display: flex;
     flex-direction: column;
