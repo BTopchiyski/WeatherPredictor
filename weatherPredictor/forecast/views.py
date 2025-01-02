@@ -13,6 +13,7 @@ from sklearn.metrics import mean_squared_error #to measure the accuracy of our p
 from datetime import datetime, timedelta #to handle date and time
 from geopy.geocoders import Nominatim
 from forecast.api_key import API_KEY
+from timezonefinder import TimezoneFinder
 
 BASE_URL = 'https://api.openweathermap.org/data/2.5/' #base url for API requests
 
@@ -21,7 +22,7 @@ def get_rounded_value(data, key):
     value = data.get(key, np.nan)
     return round(value) if not np.isnan(value) else np.nan
 
-# Function to get user's location based on IP address
+# Get user's location based on IP address
 def get_user_location(ip_address):
     try:
         response = requests.get(f"https://ipinfo.io/{ip_address}/json")
@@ -39,6 +40,16 @@ def get_user_location(ip_address):
     except Exception as e:
         print(f"Error getting user location: {e}")
     return "Sofia, Bulgaria"
+
+# Function to get the timezone of a city
+def get_timezone(city):
+    geolocator = Nominatim(user_agent="weather_app")
+    location = geolocator.geocode(city)
+    if location:
+        tf = TimezoneFinder()
+        timezone_str = tf.timezone_at(lng=location.longitude, lat=location.latitude)
+        return timezone_str
+    return None
 
 # 1. Fetch Current Weather Data
 def get_current_weather(city):
@@ -150,6 +161,14 @@ def weather_view(request):
   if 'error' in current_weather:
     return render(request, 'weather.html', {'error': current_weather['message'], 'code': current_weather['code'], 'description': 'error'})
 
+  # Get the timezone of the city
+  timezone_str = get_timezone(city)
+  if timezone_str:
+      timezone = pytz.timezone(timezone_str)
+      current_time = datetime.now(timezone)
+  else:
+      current_time = datetime.now()
+
   #load historical data
   csv_path = os.path.join('/Users/i554234/repos/WeatherPredictorApp/weatherPredictor/weather.csv')
   historical_data = read_historical_data(csv_path)
@@ -204,7 +223,7 @@ def weather_view(request):
   next_hour = now + timedelta(hours=1)
   next_hour = next_hour.replace(minute=0, second=0, microsecond=0)
 
-  future_times = [(next_hour + timedelta(hours=i)).strftime("%H:00") for i in range(5)]
+  future_times = [(current_time + timedelta(hours=i)).strftime("%H:00") for i in range(5)]
   
   #store each value separately
   time1, time2, time3, time4, time5 = future_times
@@ -224,8 +243,8 @@ def weather_view(request):
       'description': current_weather['description'],
       'clouds': current_weather['clouds'],
       'visibility': current_weather['visibility'],
-      'time': datetime.now(),
-      'date': datetime.now().strftime('B%-%d-%Y'),
+      'time': current_time.strftime("%H:%M"),
+      'date': current_time.strftime("%B %d, %Y"),
       'wind_gust_dir': compass_direction,
       'pressure': current_weather['pressure'],
       'wind': current_weather['Wind_Gust_Speed'],
