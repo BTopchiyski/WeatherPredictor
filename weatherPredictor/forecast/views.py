@@ -4,6 +4,7 @@ from django.http import HttpResponse
 import requests #This library helps us fetch data from API
 import pandas as pd #for handling and analyzing data
 import numpy as np #for numerical operations
+import joblib
 import pytz
 import os
 from sklearn.model_selection import train_test_split #to split data intro training and testing sets
@@ -12,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor #mode
 from sklearn.metrics import mean_squared_error #to measure the accuracy of our predictions
 from datetime import datetime, timedelta #to handle date and time
 from geopy.geocoders import Nominatim
+from forecast import MODEL_DIR
 from forecast.api_key import API_KEY
 from timezonefinder import TimezoneFinder
 
@@ -148,6 +150,32 @@ def predict_future(model, current_value):
 
   return predictions[1:]
 
+# Function to prepare and train the rain prediction model
+def prepare_and_train_rain_model(historical_data):
+    model_path = os.path.join(MODEL_DIR, 'rain_model.pkl')
+    le_path = os.path.join(MODEL_DIR, 'label_encoder.pkl')
+
+    if os.path.exists(model_path) and os.path.exists(le_path):
+        rain_model = joblib.load(model_path)
+        le = joblib.load(le_path)
+    else:
+        X, y, le = prepare_data(historical_data)
+        rain_model = train_rain_model(X, y)
+        joblib.dump(rain_model, model_path)
+        joblib.dump(le, le_path)
+    return rain_model
+
+# Function to prepare and train the regression model
+def prepare_and_train_regression_model(historical_data, feature):
+    model_path = os.path.join(MODEL_DIR, f'{feature}_model.pkl')
+    if os.path.exists(model_path):
+        model = joblib.load(model_path)
+    else:
+        X, y = prepare_regression_data(historical_data, feature)
+        model = train_regression_model(X, y)
+        joblib.dump(model, model_path)
+    return model
+
 #8. Weather Analysis Function
 def weather_view(request):
   if request.method == 'POST':
@@ -173,10 +201,16 @@ def weather_view(request):
   csv_path = os.path.join('/Users/i554234/repos/WeatherPredictorApp/weatherPredictor/weather.csv')
   historical_data = read_historical_data(csv_path)
 
-  #prepare and train rain prediction model
-  X, y, le = prepare_data(historical_data)
+  # Prepare and train rain prediction model
+  rain_model = prepare_and_train_rain_model(historical_data)
 
-  rain_model = train_rain_model(X, y)
+  # Load the LabelEncoder
+  le_path = os.path.join(MODEL_DIR, 'label_encoder.pkl')
+  if os.path.exists(le_path):
+      le = joblib.load(le_path)
+  else:
+      _, _, le = prepare_data(historical_data)
+      joblib.dump(le, le_path)
 
   #map wind direction to compass points
   wind_deg = current_weather['wind_gust_dir'] % 360
@@ -206,12 +240,9 @@ def weather_view(request):
   #rain prediction
   rain_prediction = rain_model.predict(current_df)[0]
 
-  #prepare regression model for temperature and humidity
-  X_temp, y_temp = prepare_regression_data(historical_data, 'Temp')
-  X_hum, y_hum = prepare_regression_data(historical_data, 'Humidity')
-
-  temp_model = train_regression_model(X_temp, y_temp)
-  hum_model = train_regression_model(X_hum, y_hum)
+  # Prepare and train regression models for temperature and humidity
+  temp_model = prepare_and_train_regression_model(historical_data, 'Temp')
+  hum_model = prepare_and_train_regression_model(historical_data, 'Humidity')
 
   #predict future temperature and humidity
   future_temp = predict_future(temp_model, current_weather['temp_min'])
