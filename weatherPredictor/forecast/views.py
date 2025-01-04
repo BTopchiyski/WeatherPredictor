@@ -18,6 +18,7 @@ from forecast.api_key import API_KEY
 from timezonefinder import TimezoneFinder
 
 BASE_URL = 'https://api.openweathermap.org/data/2.5/' #base url for API requests
+HISTORY_URL = 'https://history.openweathermap.org/data/2.5/history/' #base url for historical API requests
 
 # Helper function to get rounded value or NaN
 def get_rounded_value(data, key):
@@ -88,7 +89,35 @@ def get_current_weather(city):
 
     return_data['visibility'] = data.get('visibility', np.nan)
 
+    return_data['coord'] = data.get('coord', {})
+
     return return_data
+
+def get_historical_temperature(lat, lon, current_time):
+    end_time = int(current_time.timestamp())
+    start_time = end_time - 5 * 3600  # 5 hours ago
+    url = f"{HISTORY_URL}city?lat={lat}&lon={lon}&type=hour&start={start_time}&end={end_time}&appid={API_KEY}&units=metric"
+    response = requests.get(url)
+    data = response.json()
+
+    if response.status_code != 200:
+        return {'error': True, 'code': data.get('cod'), 'message': "OpenWeather: " + data.get('message')}
+
+    past_5_hours_temp = [entry['main']['temp'] for entry in data['list']]
+    return past_5_hours_temp
+
+def get_historical_humidity(lat, lon, current_time):
+    end_time = int(current_time.timestamp())
+    start_time = end_time - 5 * 3600  # 5 hours ago
+    url = f"{HISTORY_URL}city?lat={lat}&lon={lon}&type=hour&start={start_time}&end={end_time}&appid={API_KEY}&units=metric"
+    response = requests.get(url)
+    data = response.json()
+
+    if response.status_code != 200:
+        return {'error': True, 'code': data.get('cod'), 'message': "OpenWeather: " + data.get('message')}
+
+    past_5_hours_humidity = [entry['main']['humidity'] for entry in data['list']]
+    return past_5_hours_humidity
 
 #2. Read Historical Data
 def read_historical_data(filename):
@@ -196,6 +225,19 @@ def weather_view(request):
   else:
       current_time = datetime.now()
 
+  # Get latitude and longitude
+  lat = current_weather['coord']['lat']
+  lon = current_weather['coord']['lon']
+
+  #load historical data for location
+  past_temperature = get_historical_temperature(lat, lon, current_time)
+  if 'error' in past_temperature:
+      return render(request, 'weather.html', {'error': past_temperature['message'], 'code': past_temperature['code'], 'description': 'error'})
+
+  past_humidity = get_historical_humidity(lat, lon, current_time)
+  if 'error' in past_humidity:
+      return render(request, 'weather.html', {'error': past_humidity['message'], 'code': past_humidity['code'], 'description': 'error'})
+
   #load historical data
   csv_path = os.path.join('/Users/i554234/repos/WeatherPredictorApp/weatherPredictor/train_data/averageBulgarianWeather.csv')
   historical_data = read_historical_data(csv_path)
@@ -222,7 +264,6 @@ def weather_view(request):
       ("NNW", 326.25, 348.75), ("N", 348.75, 360.01)
   ]
   compass_direction = next(point for point, start, end in compass_points if start <= wind_deg < end)
-  compass_direction_encoded = le.transform([compass_direction])[0] if compass_direction in le.classes_ else -1
 
   current_data = {
       'MinTemp': current_weather['temp_min'],
