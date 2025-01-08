@@ -7,7 +7,7 @@ import numpy as np #for numerical operations
 import joblib
 import pytz
 import os
-from sklearn.model_selection import train_test_split #to split data intro training and testing sets
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score #to split data intro training and testing sets
 from sklearn.preprocessing import LabelEncoder #to convert categorical data into numerical
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor #models for classification and regression tasks
 from sklearn.metrics import mean_squared_error #to measure the accuracy of our predictions
@@ -164,19 +164,52 @@ def prepare_regression_data(data, feature):
 
 #6. Train Regression Model
 def train_regression_model(X, y):
-  model = RandomForestRegressor(n_estimators=100, random_state=42) #Use 100 decision trees and same random state for reproduceability
-  model.fit(X, y)
-  return model
+    # Define the parameter grid for hyperparameter tuning
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20, 30],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
+    }
+
+    # Initialize the RandomForestRegressor
+    rf = RandomForestRegressor(random_state=42)
+
+    # Perform grid search with cross-validation
+    grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, n_jobs=-1, scoring='neg_mean_squared_error')
+    grid_search.fit(X, y)
+
+    # Get the best model from grid search
+    best_model = grid_search.best_estimator_
+
+    # Evaluate the model using cross-validation
+    cv_scores = cross_val_score(best_model, X, y, cv=5, scoring='neg_mean_squared_error')
+    mean_cv_score = -cv_scores.mean()
+    std_cv_score = cv_scores.std()
+
+    print(f"Best Parameters: {grid_search.best_params_}")
+    print(f"Mean Cross-Validation MSE: {mean_cv_score:.4f}")
+    print(f"Standard Deviation of Cross-Validation MSE: {std_cv_score:.4f}")
+
+    return best_model
 
 #7. Predict Future
-def predict_future(model, current_value):
-  predictions = [current_value]
+def predict_future(model, current_value, is_temp=False):
+    predictions = []
 
-  for i in range(5): #predict the next 5 time steps
-    next_value = model.predict(np.array([[predictions[-1]]]))
-    predictions.append(next_value[0])
+    if is_temp and current_value < 0:
+        current_value = abs(current_value)
+        for i in range(5):  # predict the next 5 time steps
+            next_value = model.predict(np.array([[current_value]]))
+            predictions.append(-next_value[0])  # store as negative value
+            current_value = next_value[0]
+    else:
+        for i in range(5):  # predict the next 5 time steps
+            next_value = model.predict(np.array([[current_value]]))
+            predictions.append(next_value[0])
+            current_value = next_value[0]
 
-  return predictions[1:]
+    return predictions
 
 # Function to prepare and train the rain prediction model
 def prepare_and_train_rain_model(historical_data):
@@ -284,7 +317,7 @@ def weather_view(request):
   hum_model = prepare_and_train_regression_model(historical_data, 'Humidity')
 
   #predict future temperature and humidity
-  future_temp = predict_future(temp_model, current_weather['temp_min'])
+  future_temp = predict_future(temp_model, current_weather['temp_min'], is_temp=True)
   future_humidity = predict_future(hum_model, current_weather['humidity'])
 
   #prepare time for future predictions
