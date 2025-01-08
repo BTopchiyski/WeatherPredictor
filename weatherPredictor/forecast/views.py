@@ -1,10 +1,12 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 import requests #This library helps us fetch data from API
 import pandas as pd #for handling and analyzing data
 import numpy as np #for numerical operations
 import joblib
+import json
 import pytz
 import os
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score #to split data intro training and testing sets
@@ -24,25 +26,6 @@ HISTORY_URL = 'https://history.openweathermap.org/data/2.5/history/' #base url f
 def get_rounded_value(data, key):
     value = data.get(key, np.nan)
     return round(value) if not np.isnan(value) else np.nan
-
-# Get user's location based on IP address
-def get_user_location(ip_address):
-    try:
-        response = requests.get(f"https://ipinfo.io/{ip_address}/json")
-        data = response.json()
-        loc = data.get("loc", None)
-        if loc:
-            lat, lon = loc.split(",")
-            geolocator = Nominatim(user_agent="weather_app")
-            location = geolocator.reverse(f"{lat}, {lon}")
-            address = location.raw['address']
-            city = address.get('city')
-            country = address.get('country')
-            if city and country:
-                return f"{city}, {country}"
-    except Exception as e:
-        print(f"Error getting user location: {e}")
-    return "Sofia, Bulgaria"
 
 # Function to get the timezone of a city
 def get_timezone(city):
@@ -237,13 +220,40 @@ def prepare_and_train_regression_model(historical_data, feature):
         joblib.dump(model, model_path)
     return model
 
+@csrf_exempt
+def get_location(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        # Store latitude and longitude in session
+        request.session['latitude'] = latitude
+        request.session['longitude'] = longitude
+        return JsonResponse({'status': 'success', 'latitude': latitude, 'longitude': longitude})
+    return JsonResponse({'status': 'fail'}, status=400)
+
+def get_city_from_coordinates(latitude, longitude):
+    geolocator = Nominatim(user_agent="weather_app")
+    location = geolocator.reverse((latitude, longitude), exactly_one=True)
+    if location:
+        address = location.raw['address']
+        city = address.get('city', address.get('town', address.get('village', '')))
+        return city
+    return 'Sofia, Bulgaria'  # Default location
+
 #8. Weather Analysis Function
 def weather_view(request):
   if request.method == 'POST':
     city = request.POST.get('city')
   else:
-    ip_address = request.META.get('REMOTE_ADDR', None)
-    city = get_user_location(ip_address)
+    latitude = request.session.get('latitude')
+    longitude = request.session.get('longitude')
+    request.session.get('longitude')
+
+    if latitude and longitude:
+        city = get_city_from_coordinates(latitude, longitude)
+    else:
+        city = 'Pirdop, Bulgaria'  # Default location
     
   current_weather = get_current_weather(city)
 
