@@ -21,6 +21,7 @@ from timezonefinder import TimezoneFinder
 
 BASE_URL = 'https://api.openweathermap.org/data/2.5/' #base url for API requests
 HISTORY_URL = 'https://history.openweathermap.org/data/2.5/history/' #base url for historical API requests
+AIR_POLLUTION_URL = 'https://api.openweathermap.org/data/2.5/air_pollution' #base url for air pollution API requests
 
 # Helper function to get rounded value or NaN
 def get_rounded_value(data, key):
@@ -36,6 +37,44 @@ def get_timezone(city):
         timezone_str = tf.timezone_at(lng=location.longitude, lat=location.latitude)
         return timezone_str
     return None
+
+def get_air_pollution(lat, lon):
+    url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
+    response = requests.get(url)
+    if response.status_code != 200:
+        return {'error': True, 'code': response.status_code, 'message': "OpenWeather: " + response.json().get('message', 'Error fetching air pollution data')}
+    
+    data = response.json()
+    if not data.get('list'):
+        return {'error': True, 'message': 'No air pollution data found'}
+
+    pollution_data = data['list'][0]
+    components = pollution_data.get('components', {})
+
+    aqi = pollution_data.get('main', {}).get('aqi', np.nan)
+    aqi_description = {
+        1: 'Good',
+        2: 'Fair',
+        3: 'Moderate',
+        4: 'Poor',
+        5: 'Very Poor'
+    }.get(aqi, 'Unknown')
+
+    return {
+        'error': False,
+        'aqi': aqi,
+        'aqi_description': aqi_description,
+        'components': {
+            'co': components.get('co', np.nan),
+            'no': components.get('no', np.nan),
+            'no2': components.get('no2', np.nan),
+            'o3': components.get('o3', np.nan),
+            'so2': components.get('so2', np.nan),
+            'pm2_5': components.get('pm2_5', np.nan),
+            'pm10': components.get('pm10', np.nan),
+            'nh3': components.get('nh3', np.nan),
+        }
+    }
 
 # 1. Fetch Current Weather Data
 def get_current_weather(city):
@@ -248,7 +287,6 @@ def weather_view(request):
   else:
     latitude = request.session.get('latitude')
     longitude = request.session.get('longitude')
-    request.session.get('longitude')
 
     if latitude and longitude:
         city = get_city_from_coordinates(latitude, longitude)
@@ -271,6 +309,12 @@ def weather_view(request):
   # Get latitude and longitude
   lat = current_weather['coord']['lat']
   lon = current_weather['coord']['lon']
+
+  # Get air pollution data
+  air_pollution = get_air_pollution(lat, lon)
+  if air_pollution['error']:
+      return render(request, 'weather.html', {'error': air_pollution['message'], 'description': 'error'})
+
 
   #load historical data for location
   past_temperature = get_historical_temperature(lat, lon, current_time)
@@ -360,5 +404,8 @@ def weather_view(request):
       'time1': time1, 'time2': time2, 'time3': time3, 'time4': time4, 'time5': time5,
       'temp1': f"{round(temp1, 1)}", 'temp2': f"{round(temp2, 1)}", 'temp3': f"{round(temp3, 1)}", 'temp4': f"{round(temp4, 1)}", 'temp5': f"{round(temp5, 1)}",
       'hum1': f"{round(hum1, 1)}", 'hum2': f"{round(hum2, 1)}", 'hum3': f"{round(hum3, 1)}", 'hum4': f"{round(hum4, 1)}", 'hum5': f"{round(hum5, 1)}",
+      'air_quality_index': air_pollution['aqi'],
+      'air_quality_description': air_pollution['aqi_description'],
+      'components': air_pollution['components'],
   }
   return render(request, 'weather.html', context)

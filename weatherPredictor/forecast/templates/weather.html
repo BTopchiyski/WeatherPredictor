@@ -71,6 +71,7 @@
                     <span class="weather__location-date">{{ date }}</span>
                 </p>
             </div>
+            <h3 class="weather__primary-title">Weather Data</h3>
             <p class="weather__primary-stats">
                 Wind <span class="weatherWindKph">{{ wind }}</span> km/h from the
                 <span class="weatherWindDirection">{{ wind_gust_dir }}</span> direction.
@@ -80,6 +81,19 @@
                 Minimum temperature is <span class="weatherMinTemp">{{ MinTemp }}</span>°C.
                 Chance of rain: <span class="weatherRainPrediction">{{ rain_prediction }}</span>.
             </p>
+            <h3 class="weather__primary-title">Air Pollution Data</h3>
+            <p class="weather__air-pollution">
+                Air Quality Index: <span class="airQualityIndex">{{ air_quality_index }}</span> ({{ air_quality_description }}).
+                Сoncentration of CO (Carbon monoxide) is <span class="airComponent">{{ components.co }}</span> μg/m³,
+                NO (Nitrogen monoxide) is <span class="airComponent">{{ components.no }}</span> μg/m³,
+                NO2 (Nitrogen dioxide) is <span class="airComponent">{{ components.no2 }}</span> μg/m³,
+                O3 (Ozone) is <span class="airComponent">{{ components.o3 }}</span> μg/m³,
+                SO2 (Sulphur dioxide) is <span class="airComponent">{{ components.so2 }}</span> μg/m³,
+                PM2.5 (Fine particles matter) is <span class="airComponent">{{ components.pm2_5 }}</span> μg/m³,
+                PM10 (Coarse particulate matter) is <span class="airComponent">{{ components.pm10 }}</span> μg/m³,
+                NH3 (Ammonia) is <span class="airComponent">{{ components.nh3 }}</span> μg/m³.
+            </p>
+            <h3 class="weather__primary-title">Forecast</h3>
             <ul class="forecast">
                 <li class="forecast-item">
                     <p class="forecast-time"> {{ time1 }}</p>

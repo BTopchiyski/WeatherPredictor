@@ -255,7 +255,14 @@ main.error {
     width: 50vw;
     color: white;
     font-size: 1em;
-    margin-bottom: 10vh;
+    margin-bottom: 5vh;
+}
+
+.weather__air-pollution {
+    width: 50vw;
+    color: white;
+    font-size: 1em;
+    margin-bottom: 5vh;
 }
 
 /* Forecast Stats */
