@@ -1,14 +1,16 @@
 import json
 import csv
 import os
+from datetime import datetime
 
-# Define the paths to the JSON files and the output CSV file
+# Define the paths to the JSON files and the output CSV files
 json_files = [
     os.path.join(os.path.dirname(__file__), '..', 'train_data', 'plovdivWeather.json'),
     os.path.join(os.path.dirname(__file__), '..', 'train_data', 'sofiaWeather.json'),
     os.path.join(os.path.dirname(__file__), '..', 'train_data', 'burgasWeather.json')
 ]
 csv_file_path = os.path.join(os.path.dirname(__file__), '..', 'train_data', 'averageBulgarianWeather.csv')
+prophet_csv_file_path = os.path.join(os.path.dirname(__file__), '..', 'train_data', 'prophetWeatherData.csv')
 
 # Define the threshold for determining if it will rain tomorrow
 PRECIPITATION_THRESHOLD = 0.9  # Example threshold value in mm
@@ -50,6 +52,8 @@ all_weather_data = [read_weather_data(json_file) for json_file in json_files]
 average_weather_data = []
 for day_entries in zip(*all_weather_data):
     avg_day_data = {
+        'Month': day_entries[0]['Month'],
+        'Day': day_entries[0]['Day'],
         'MinTemp': round(sum(entry['MinTemp'] for entry in day_entries) / len(day_entries), 1),
         'MaxTemp': round(sum(entry['MaxTemp'] for entry in day_entries) / len(day_entries), 1),
         'WindGustSpeed': round(sum(entry['WindGustSpeed'] for entry in day_entries) / len(day_entries), 1),
@@ -62,11 +66,30 @@ for day_entries in zip(*all_weather_data):
 
 # Write the averaged data to a new CSV file
 with open(csv_file_path, 'w', newline='') as csvfile:
-    fieldnames = ['MinTemp', 'MaxTemp', 'WindGustSpeed', 'Humidity', 'Pressure', 'Temp', 'RainTomorrow']
+    fieldnames = ['Month', 'Day', 'MinTemp', 'MaxTemp', 'WindGustSpeed', 'Humidity', 'Pressure', 'Temp', 'RainTomorrow']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
     writer.writeheader()
     for row in average_weather_data:
         writer.writerow(row)
 
-print("Data has been successfully processed and written to averageBulgarianWeather.csv")
+# Prepare data for Prophet
+prophet_data = []
+for entry in average_weather_data:
+    try:
+        date_str = f"2023-{entry['Month']:02d}-{entry['Day']:02d}"  # Use a fixed year for simplicity
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+        prophet_data.append({'ds': date, 'y': entry['Temp']})
+    except ValueError:
+        print(f"Invalid date: {date_str}")
+
+# Write the Prophet data to a new CSV file
+with open(prophet_csv_file_path, 'w', newline='') as csvfile:
+    fieldnames = ['ds', 'y']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+    writer.writeheader()
+    for row in prophet_data:
+        writer.writerow(row)
+
+print("Data has been successfully processed and written to averageBulgarianWeather.csv and prophetWeatherData.csv")
